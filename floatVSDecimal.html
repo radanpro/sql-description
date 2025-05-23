@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>الفرق بين DECIMAL و FLOAT في SQL</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Arabic:wght@400;700&family=Tajawal:wght@400;700&display=swap" rel="stylesheet">
+    <!-- Visualization & Content Choices: 
+        - Introduction: Text. Goal: Set context.
+        - DECIMAL Section: Text, code snippets (`DECIMAL(p,s)`). Goal: Explain DECIMAL.
+        - FLOAT Section: Text, code snippets. Goal: Explain FLOAT.
+        - Direct Comparison: HTML Table, Chart.js Bar Chart (Storage/Performance). Goal: Juxtapose key differences. Interaction: Chart tooltips.
+        - Historical Evolution: HTML/CSS Timeline. Goal: Show development over time.
+        - SQL Integration: Text. Goal: Explain standardization.
+        - Conclusion: Text. Goal: Summarize.
+        - All text from the source report, adapted for clarity and conciseness.
+        - Library: Chart.js for charts. NO SVG/Mermaid. -->
+    <style>
+        body {
+            font-family: 'Tajawal', 'Noto Sans Arabic', sans-serif;
+            scroll-behavior: smooth;
+        }
+        .section-title {
+            @apply text-3xl font-bold text-teal-700 mb-6 pb-2 border-b-2 border-teal-500;
+        }
+        .subsection-title {
+            @apply text-2xl font-semibold text-teal-600 mt-6 mb-4;
+        }
+        .content-text {
+            @apply text-lg text-neutral-700 leading-relaxed mb-4;
+        }
+        .code-block {
+            @apply bg-neutral-800 text-white p-4 rounded-md my-4 text-left dir-ltr overflow-x-auto;
+        }
+        .nav-link {
+            @apply px-4 py-2 text-neutral-700 hover:text-teal-600 hover:bg-stone-200 rounded-md transition-colors;
+        }
+        .nav-link.active {
+            @apply text-teal-700 bg-stone-200 font-semibold;
+        }
+        .chart-container {
+            position: relative; 
+            width: 100%; 
+            max-width: 600px; /* Or Tailwind max-w-xl, max-w-2xl */
+            margin-left: auto; 
+            margin-right: auto; 
+            height: 300px; /* Base height */
+            max-height: 400px; /* Max height */
+        }
+        @media (min-width: 768px) { /* md breakpoint */
+            .chart-container {
+                height: 350px; 
+            }
+        }
+        .timeline {
+            position: relative;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .timeline::after {
+            content: '';
+            position: absolute;
+            width: 6px;
+            background-color: #0d9488; /* teal-600 */
+            top: 0;
+            bottom: 0;
+            right: 50%;
+            margin-right: -3px;
+        }
+        .timeline-container {
+            padding: 10px 40px;
+            position: relative;
+            background-color: inherit;
+            width: 50%;
+        }
+        .timeline-container.left {
+            left: 0;
+        }
+        .timeline-container.right {
+            left: 50%;
+        }
+        .timeline-container::after {
+            content: '';
+            position: absolute;
+            width: 25px;
+            height: 25px;
+            right: -12px; /* Adjusted for RTL */
+            background-color: white;
+            border: 4px solid #0f766e; /* teal-700 */
+            top: 15px;
+            border-radius: 50%;
+            z-index: 1;
+        }
+        .timeline-container.right::after {
+            left: -13px; /* Adjusted for RTL */
+            right: auto;
+        }
+        .timeline-content {
+            padding: 20px 30px;
+            background-color: white;
+            position: relative;
+            border-radius: 6px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+         /* RTL adjustments for timeline bullets */
+        .timeline-container.left::after {
+            right: -12px; 
+        }
+        .timeline-container.right::after {
+            left: -13px;
+            right: auto;
+        }
+
+        @media screen and (max-width: 768px) {
+            .timeline::after {
+                right: 31px;
+            }
+            .timeline-container {
+                width: 100%;
+                padding-left: 70px; /* Adjusted for RTL */
+                padding-right: 25px; /* Adjusted for RTL */
+            }
+            .timeline-container.right {
+                left: 0%;
+            }
+            .timeline-container.left::after, .timeline-container.right::after {
+                left: auto; /* Reset for RTL */
+                right: 15px; /* Position to the right for RTL */
+            }
+        }
+    </style>
+</head>
+<body class="bg-stone-100 text-neutral-800">
+
+    <nav class="bg-white shadow-md sticky top-0 z-50">
+        <div class="container mx-auto px-6 py-3 flex flex-wrap justify-center items-center">
+            <div class="flex flex-wrap justify-center space-x-1 space-x-reverse">
+                <a href="#intro" class="nav-link active">مقدمة</a>
+                <a href="#decimal" class="nav-link">DECIMAL</a>
+                <a href="#float" class="nav-link">FLOAT</a>
+                <a href="#comparison" class="nav-link">مقارنة مباشرة</a>
+                <a href="#history" class="nav-link">التطور التاريخي</a>
+                <a href="#sql-integration" class="nav-link">التكامل في SQL</a>
+                <a href="#conclusion" class="nav-link">الخلاصة</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mx-auto px-6 py-8">
+
+        <section id="intro" class="pt-16 -mt-16 mb-12">
+            <h2 class="section-title">مقدمة: أهمية أنواع البيانات في SQL</h2>
+            <p class="content-text">
+                تُعد أنواع البيانات في لغة الاستعلامات الهيكلية (SQL) حجر الزاوية في تصميم قواعد البيانات الفعالة والموثوقة. فهي لا تحدد فقط طبيعة القيم التي يمكن تخزينها في الأعمدة المختلفة، بل تؤثر أيضًا بشكل مباشر على سلامة البيانات، كفاءة التخزين، وأداء الاستعلامات. هذا التطبيق يستكشف بعمق نوعين من البيانات الرقمية الهامة: `DECIMAL` و `FLOAT`، موضحًا فروقهما الجوهرية، أصولهما، والحالات المثالية لاستخدام كل منهما.
+            </p>
+            <p class="content-text">
+                يهدف هذا العرض التفاعلي إلى تبسيط المفاهيم المعقدة المتعلقة بـ `DECIMAL` و `FLOAT`، مما يساعد المطورين ومصممي قواعد البيانات على اتخاذ قرارات مستنيرة تضمن الدقة والكفاءة في تطبيقاتهم.
+            </p>
+        </section>
+
+        <section id="decimal" class="pt-16 -mt-16 mb-12">
+            <h2 class="section-title">فهم DECIMAL: نوع البيانات الرقمي الدقيق</h2>
+            <p class="content-text">
+                يُعد نوع البيانات `DECIMAL` (وغالبًا ما يكون مرادفًا لـ `NUMERIC`) مصممًا خصيصًا لتخزين القيم الرقمية التي تتطلب دقة مطلقة. هذا يجعله الخيار الأمثل للتطبيقات المالية، المحاسبية، أو أي سيناريو حيث يمكن أن تؤدي أخطاء التقريب الطفيفة إلى عواقب وخيمة. يمثل `DECIMAL` أرقامًا ذات نقطة ثابتة، مما يعني أن العدد الإجمالي للأرقام وعدد الأرقام بعد الفاصلة العشرية يتم تحديدهما بدقة عند تعريف العمود.
+            </p>
+            <div class="bg-white p-6 rounded-lg shadow mb-6">
+                <h3 class="subsection-title">البنية الأساسية (Syntax)</h3>
+                <p class="content-text">
+                    يتم تعريف `DECIMAL` عادةً بالشكل التالي:
+                </p>
+                <pre class="code-block"><code>DECIMAL(p, s)</code></pre>
+                <ul class="list-disc list-inside content-text space-y-2">
+                    <li><code>p</code> (الدقة - precision): العدد الإجمالي للأرقام التي يمكن تخزينها (قبل وبعد الفاصلة العشرية).</li>
+                    <li><code>s</code> (المقياس - scale): عدد الأرقام على يمين الفاصلة العشرية.</li>
+                </ul>
+                <p class="content-text">مثال: `DECIMAL(10, 2)` يمكنه تخزين أرقام مثل 12345678.90.</p>
+            </div>
+
+            <div class="bg-white p-6 rounded-lg shadow mb-6">
+                <h3 class="subsection-title">النطاق والقيم الافتراضية</h3>
+                 <p class="content-text">في SQL Server، تتراوح الدقة `p` من 1 إلى 38 (الافتراضي 18)، والمقياس `s` الافتراضي هو 0. في MySQL، الحد الأقصى للدقة `M` هو 65، وللمقياس `D` هو 30 (الافتراضي `M=10, D=0`).</p>
+            </div>
+
+            <div class="bg-white p-6 rounded-lg shadow mb-6">
+                <h3 class="subsection-title">آليات التخزين</h3>
+                <p class="content-text">
+                    تختلف آليات التخزين بين أنظمة قواعد البيانات. فمثلاً، في MySQL 5.0 والإصدارات الأحدث، يتم تخزين قيم `DECIMAL` بتنسيق ثنائي مضغوط فعال. يتطلب عمود `DECIMAL(18,9)` حوالي 8 بايتات.
+                </p>
+            </div>
+
+            <div class="bg-white p-6 rounded-lg shadow">
+                <h3 class="subsection-title">حالات الاستخدام الأساسية</h3>
+                <ul class="list-disc list-inside content-text space-y-2">
+                    <li>البيانات المالية والنقدية (أساسي).</li>
+                    <li>البيانات القانونية والقابلة للتدقيق.</li>
+                    <li>القياسات الدقيقة وإدارة المخزون.</li>
+                    <li>أي تطبيق يتطلب تمثيلًا رقميًا دقيقًا لا يقبل أخطاء التقريب.</li>
+                </ul>
+            </div>
+             <div class="bg-white p-6 rounded-lg shadow mt-6">
+                <h3 class="subsection-title">اعتبارات الأداء والمقايضات</h3>
+                <p class="content-text">
+                    العمليات على `DECIMAL` أبطأ عمومًا من `FLOAT` لأنها تتطلب معالجة برمجية بدلاً من الاعتماد على وحدات المعالجة المركزية (CPU) مباشرة. ومع ذلك، فإن هذه التكلفة مقبولة تمامًا عند الحاجة للدقة المطلقة. محاولة إدخال قيمة تتجاوز الدقة أو المقياس المحدد ستؤدي إلى خطأ، مما يحافظ على سلامة البيانات.
+                </p>
+            </div>
+        </section>
+
+        <section id="float" class="pt-16 -mt-16 mb-12">
+            <h2 class="section-title">فهم FLOAT: نوع البيانات الرقمي التقريبي</h2>
+            <p class="content-text">
+                يُستخدم نوع البيانات `FLOAT` (بما في ذلك `REAL` و `DOUBLE PRECISION`) لتخزين القيم الرقمية التقريبية باستخدام تمثيل النقطة العائمة. هذا يعني أنه لا يمكن دائمًا ضمان الدقة المطلقة، وقد تحدث أخطاء تقريب صغيرة. ومع ذلك، يتميز `FLOAT` بقدرته على تمثيل نطاق واسع جدًا من القيم (كبيرة جدًا أو صغيرة جدًا) وهو أسرع في العمليات الحسابية.
+            </p>
+            <div class="bg-white p-6 rounded-lg shadow mb-6">
+                <h3 class="subsection-title">الأنواع والدقة</h3>
+                <p class="content-text">
+                    توجد عادةً دقة أحادية (single-precision، مثل `FLOAT` أو `REAL`، تستهلك 4 بايتات) ودقة مزدوجة (double-precision، مثل `DOUBLE PRECISION` أو `FLOAT(n)` حيث n كبير، تستهلك 8 بايتات). الدقة المزدوجة توفر نطاقًا أكبر وأرقامًا عشرية أكثر أهمية.
+                </p>
+                <p class="content-text">على سبيل المثال، `FLOAT` قد يوفر حوالي 6-9 أرقام عشرية دقيقة، بينما `DOUBLE PRECISION` يوفر حوالي 15-17 رقمًا.</p>
+            </div>
+
+            <div class="bg-white p-6 rounded-lg shadow mb-6">
+                <h3 class="subsection-title">آليات التخزين</h3>
+                <p class="content-text">
+                    تلتزم أنواع `FLOAT` عادةً بمعيار IEEE 754 للحساب العائم. يتم ترميز الرقم باستخدام بت إشارة، حقل أس، وجزء دال (مانتيسا).
+                </p>
+            </div>
+            
+            <div class="bg-white p-6 rounded-lg shadow">
+                <h3 class="subsection-title">حالات الاستخدام الأساسية</h3>
+                <ul class="list-disc list-inside content-text space-y-2">
+                    <li>الحسابات العلمية والهندسية.</li>
+                    <li>البيانات الجغرافية المكانية (مثل خطوط الطول والعرض).</li>
+                    <li>بيانات المستشعرات (درجة الحرارة، الرطوبة).</li>
+                    <li>الرسومات والمحاكاة.</li>
+                </ul>
+            </div>
+            <div class="bg-white p-6 rounded-lg shadow mt-6">
+                <h3 class="subsection-title">اعتبارات الأداء والمزايا</h3>
+                <p class="content-text">
+                    العمليات على `FLOAT` أسرع بكثير من `DECIMAL` لأن وحدات المعالجة المركزية الحديثة تحتوي على وحدات نقطة عائمة (FPUs) مخصصة. كما أنها أكثر كفاءة في التخزين لكميات كبيرة من البيانات الرقمية ذات النطاق الواسع.
+                </p>
+                <h4 class="text-xl font-semibold text-rose-600 mt-4 mb-2">فقدان الدقة وآثاره</h4>
+                <p class="content-text">
+                    الطبيعة التقريبية لـ `FLOAT` تعني أن بعض الكسور العشرية (مثل 0.1 أو 0.3) لا يمكن تمثيلها بدقة في النظام الثنائي. هذه الأخطاء الصغيرة يمكن أن تتراكم في العمليات الحسابية المعقدة. لهذا السبب، لا ينبغي استخدام قيم `FLOAT` في اختبارات المساواة الدقيقة (مثل `WHERE column = 0.3`).
+                </p>
+            </div>
+        </section>
+
+        <section id="comparison" class="pt-16 -mt-16 mb-12">
+            <h2 class="section-title">مقارنة مباشرة: DECIMAL مقابل FLOAT</h2>
+            <p class="content-text">
+                يوضح الجدول التالي الفروقات الرئيسية بين `DECIMAL` و `FLOAT` لمساعدتك في اتخاذ القرار المناسب لتطبيقك.
+            </p>
+            <div class="overflow-x-auto bg-white p-6 rounded-lg shadow mb-8">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-teal-50">
+                        <tr>
+                            <th class="px-6 py-3 text-right text-xs font-medium text-teal-700 uppercase tracking-wider">الخاصية</th>
+                            <th class="px-6 py-3 text-right text-xs font-medium text-teal-700 uppercase tracking-wider">DECIMAL</th>
+                            <th class="px-6 py-3 text-right text-xs font-medium text-teal-700 uppercase tracking-wider">FLOAT</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        <tr>
+                            <td class="px-6 py-4 whitespace-nowrap font-semibold">الدقة</td>
+                            <td class="px-6 py-4">دقة تامة (نقطة ثابتة)</td>
+                            <td class="px-6 py-4">دقة تقريبية (نقطة عائمة)</td>
+                        </tr>
+                        <tr>
+                            <td class="px-6 py-4 whitespace-nowrap font-semibold">التمثيل</td>
+                            <td class="px-6 py-4">عشري، يحافظ على القيمة الدقيقة</td>
+                            <td class="px-6 py-4">ثنائي، قد تحدث أخطاء تقريب</td>
+                        </tr>
+                        <tr>
+                            <td class="px-6 py-4 whitespace-nowrap font-semibold">التخزين</td>
+                            <td class="px-6 py-4">أكبر، يعتمد على الدقة والمقياس</td>
+                            <td class="px-6 py-4">أصغر، ثابت (4 أو 8 بايت عادةً)</td>
+                        </tr>
+                        <tr>
+                            <td class="px-6 py-4 whitespace-nowrap font-semibold">الأداء</td>
+                            <td class="px-6 py-4">أبطأ (معالجة برمجية)</td>
+                            <td class="px-6 py-4">أسرع (دعم CPU أصلي)</td>
+                        </tr>
+                        <tr>
+                            <td class="px-6 py-4 whitespace-nowrap font-semibold">سلوك التقريب</td>
+                            <td class="px-6 py-4">يتجنب أخطاء التقريب للقيم العشرية</td>
+                            <td class="px-6 py-4">أخطاء تقريب متأصلة</td>
+                        </tr>
+                        <tr>
+                            <td class="px-6 py-4 whitespace-nowrap font-semibold">فحوصات المساواة</td>
+                            <td class="px-6 py-4">موثوقة</td>
+                            <td class="px-6 py-4">غير موثوقة بسبب التقريب</td>
+                        </tr>
+                        <tr>
+                            <td class="px-6 py-4 whitespace-nowrap font-semibold">حالات الاستخدام</td>
+                            <td class="px-6 py-4">مالية، محاسبة، قياسات دقيقة</td>
+                            <td class="px-6 py-4">علمية، هندسية، رسومات، نطاق واسع</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="grid md:grid-cols-2 gap-8">
+                <div class="bg-white p-6 rounded-lg shadow">
+                    <h3 class="subsection-title">مقارنة التخزين (تقديري)</h3>
+                    <div class="chart-container">
+                        <canvas id="storageChart"></canvas>
+                    </div>
+                    <p class="content-text mt-4 text-sm text-center">رسم بياني يوضح استهلاك التخزين التقريبي بالبايت.</p>
+                </div>
+                <div class="bg-white p-6 rounded-lg shadow">
+                    <h3 class="subsection-title">مقارنة الأداء (مفاهيمي)</h3>
+                     <div class="chart-container">
+                        <canvas id="performanceChart"></canvas>
+                    </div>
+                    <p class="content-text mt-4 text-sm text-center">رسم بياني يوضح الأداء النسبي (FLOAT أسرع بشكل عام).</p>
+                </div>
+            </div>
+        </section>
+
+        <section id="history" class="pt-16 -mt-16 mb-12">
+            <h2 class="section-title">التطور التاريخي والمنطق وراء إنشائهما</h2>
+            <p class="content-text">
+                لم يظهر نوعا البيانات `DECIMAL` و `FLOAT` بشكل عشوائي، بل كانا نتيجة لتطور احتياجات الحوسبة وقدرات الأجهزة.
+            </p>
+            <div class="bg-white p-6 rounded-lg shadow mb-6">
+                <h3 class="subsection-title">أصل DECIMAL: الحساب ذو النقطة الثابتة</h3>
+                <p class="content-text">
+                    كان الحساب ذو النقطة الثابتة هو السائد في الحوسبة المبكرة لتمثيل الأرقام الكسرية. يتم تخزين الرقم كعدد صحيح مع عامل قياس ضمني (مثل تخزين 1.23 كـ 123 مع مقياس 1/100). هذا النهج ضروري للتطبيقات التي تتطلب دقة مطلقة، مثل العمليات المالية، لأنه يتجنب أخطاء التقريب المتأصلة في التمثيل الثنائي للكسور العشرية.
+                </p>
+            </div>
+            <div class="bg-white p-6 rounded-lg shadow mb-6">
+                <h3 class="subsection-title">أصل FLOAT: الحساب ذو النقطة العائمة</h3>
+                <p class="content-text">
+                    ظهر الحساب ذو النقطة العائمة لمواجهة تحدي تمثيل نطاق هائل من الأرقام (من الصغيرة جدًا إلى الكبيرة جدًا) باستخدام عدد ثابت من البتات. يسمح "للنقطة" بأن "تطفو"، مما يوفر نطاقًا ديناميكيًا واسعًا على حساب بعض الدقة. كان هذا حاسمًا للتطبيقات العلمية والهندسية. أدى توحيد معيار IEEE 754 في عام 1985 إلى اتساق كبير في هذا المجال.
+                </p>
+            </div>
+             <div class="bg-white p-6 rounded-lg shadow">
+                <h3 class="subsection-title">جدول زمني مبسط للتطور</h3>
+                <div class="timeline">
+                    <div class="timeline-container right">
+                        <div class="timeline-content">
+                            <h4 class="font-semibold text-lg text-teal-700">1940s - 1960s</h4>
+                            <p class="text-sm text-neutral-600">ظهور مفاهيم النقطة العائمة في الحواسيب المبكرة (مثل Z3, IBM 704). الحساب بالنقطة الثابتة هو السائد للتطبيقات التجارية.</p>
+                        </div>
+                    </div>
+                    <div class="timeline-container left">
+                        <div class="timeline-content">
+                            <h4 class="font-semibold text-lg text-teal-700">1970s</h4>
+                            <p class="text-sm text-neutral-600">تطوير SQL. الحاجة إلى أنواع بيانات للتعامل مع الأرقام الدقيقة والتقريبية بدأت تتضح.</p>
+                        </div>
+                    </div>
+                    <div class="timeline-container right">
+                        <div class="timeline-content">
+                            <h4 class="font-semibold text-lg text-teal-700">1985</h4>
+                            <p class="text-sm text-neutral-600">إصدار معيار IEEE 754، لتوحيد حسابات النقطة العائمة، مما أثر بشكل كبير على تطبيقات `FLOAT`.</p>
+                        </div>
+                    </div>
+                     <div class="timeline-container left">
+                        <div class="timeline-content">
+                            <h4 class="font-semibold text-lg text-teal-700">1989</h4>
+                            <p class="text-sm text-neutral-600">معالج Intel i486 يدمج وحدة النقطة العائمة (FPU)، مما يجعلها قياسية في الحواسيب الشخصية.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="sql-integration" class="pt-16 -mt-16 mb-12">
+            <h2 class="section-title">التكامل في معايير SQL</h2>
+            <p class="content-text">
+                تم تطوير لغة SQL في أوائل السبعينيات، وتم اعتمادها كمعيار ANSI في 1986 (SQL-86) و ISO في 1987. كان معيار SQL-86 بسيطًا ولم يتضمن بشكل صريح `DECIMAL` أو `FLOAT` بالصورة الحالية.
+            </p>
+            <div class="bg-white p-6 rounded-lg shadow">
+                <h3 class="subsection-title">معيار SQL-92: نقطة تحول</h3>
+                <p class="content-text">
+                    شكل معيار SQL-92 (المعروف أيضًا بـ SQL2) قفزة كبيرة، حيث قدم نطاقًا أوسع من أنواع البيانات لمعالجة التعقيد المتزايد للبيانات. الأهم من ذلك، أن SQL-92 أضفى الطابع الرسمي على إدراج `DECIMAL`، `NUMERIC`، `FLOAT`، `REAL`، و `DOUBLE PRECISION` كأنواع بيانات رقمية قياسية.
+                </p>
+                <p class="content-text">
+                    يعكس إدراج كلا النوعين (الدقيق والتقريبي) فهمًا ناضجًا للاحتياجات المتنوعة لإدارة البيانات، من التطبيقات المالية التي تتطلب دقة مطلقة إلى التطبيقات العلمية التي تحتاج إلى نطاق واسع وسرعة.
+                </p>
+            </div>
+        </section>
+
+        <section id="conclusion" class="pt-16 -mt-16 mb-12">
+            <h2 class="section-title">الخلاصة: متى تختار DECIMAL ومتى تختار FLOAT؟</h2>
+            <p class="content-text">
+                الاختيار بين `DECIMAL` و `FLOAT` هو قرار استراتيجي يعتمد على المتطلبات المحددة لتطبيقك.
+            </p>
+            <div class="bg-white p-6 rounded-lg shadow">
+                <ul class="list-disc list-inside content-text space-y-3">
+                    <li>
+                        <strong>اختر `DECIMAL` (أو `NUMERIC`) عندما:</strong>
+                        <ul class="list-circle list-inside mr-4 mt-1 space-y-1">
+                            <li>الدقة المطلقة أمر بالغ الأهمية (مثل البيانات المالية، المحاسبة، العملات).</li>
+                            <li>أخطاء التقريب غير مقبولة على الإطلاق.</li>
+                            <li>البيانات تحتاج إلى أن تكون قابلة للتدقيق بدقة.</li>
+                        </ul>
+                    </li>
+                    <li>
+                        <strong>اختر `FLOAT` (أو `REAL`/`DOUBLE PRECISION`) عندما:</strong>
+                        <ul class="list-circle list-inside mr-4 mt-1 space-y-1">
+                            <li>تحتاج إلى تمثيل نطاق واسع جدًا من القيم (كبيرة جدًا أو صغيرة جدًا).</li>
+                            <li>سرعة العمليات الحسابية وكفاءة التخزين هي الأولوية (مثل الحسابات العلمية، الرسوميات، بيانات المستشعرات).</li>
+                            <li>درجة صغيرة من التقريب مقبولة ولا تؤثر على النتيجة الإجمالية بشكل كبير.</li>
+                            <li>لا يتم استخدام القيم في اختبارات المساواة الدقيقة.</li>
+                        </ul>
+                    </li>
+                </ul>
+                <p class="content-text mt-4">
+                    فهم الفروق الجوهرية بين هذين النوعين من البيانات يمكّن المطورين من بناء أنظمة قواعد بيانات أكثر قوة وموثوقية وكفاءة.
+                </p>
+            </div>
+        </section>
+    </div>
+
+    <footer class="bg-neutral-800 text-stone-300 text-center p-6 mt-12">
+        <p>&copy; 2025 تطبيق توضيحي حول DECIMAL و FLOAT. جميع الحقوق محفوظة لمحتوى التقرير الأصلي.</p>
+    </footer>
+
+    <script>
+        // Chart.js configuration
+        const storageCtx = document.getElementById('storageChart').getContext('2d');
+        new Chart(storageCtx, {
+            type: 'bar',
+            data: {
+                labels: ['DECIMAL(10,2)', 'DECIMAL(18,9)', 'FLOAT (4B)', 'DOUBLE (8B)'],
+                datasets: [{
+                    label: 'استهلاك التخزين (بايت)',
+                    data: [5, 9, 4, 8], // Approximate values, can vary by RDBMS
+                    backgroundColor: [
+                        'rgba(20, 184, 166, 0.6)', // teal-500
+                        'rgba(13, 148, 136, 0.6)', // teal-600
+                        'rgba(245, 158, 11, 0.6)', // amber-500
+                        'rgba(217, 119, 6, 0.6)'  // amber-600
+                    ],
+                    borderColor: [
+                        'rgba(20, 184, 166, 1)',
+                        'rgba(13, 148, 136, 1)',
+                        'rgba(245, 158, 11, 1)',
+                        'rgba(217, 119, 6, 1)'
+                    ],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: { display: true, text: 'بايت' }
+                    }
+                },
+                plugins: {
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return context.dataset.label + ': ' + context.parsed.y + ' بايت';
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        const performanceCtx = document.getElementById('performanceChart').getContext('2d');
+        new Chart(performanceCtx, {
+            type: 'bar',
+            data: {
+                labels: ['عمليات DECIMAL', 'عمليات FLOAT'],
+                datasets: [{
+                    label: 'السرعة النسبية (الأقل أفضل)',
+                    data: [70, 30], // Conceptual: Float is faster
+                    backgroundColor: [
+                        'rgba(239, 68, 68, 0.6)', // red-500
+                        'rgba(34, 197, 94, 0.6)' // green-500
+                    ],
+                    borderColor: [
+                        'rgba(239, 68, 68, 1)',
+                        'rgba(34, 197, 94, 1)'
+                    ],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                indexAxis: 'y',
+                scales: {
+                    x: {
+                        beginAtZero: true,
+                        title: { display: true, text: 'وحدة زمنية نسبية (مفاهيمي)' }
+                    }
+                },
+                 plugins: {
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                let label = context.dataset.label || '';
+                                if (label) {
+                                    label += ': ';
+                                }
+                                if (context.parsed.x !== null) {
+                                    label += context.parsed.x;
+                                    if (context.label === 'عمليات FLOAT') label += ' (أسرع)';
+                                    else label += ' (أبطأ)';
+                                }
+                                return label;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        // Active navigation link highlighting
+        const navLinks = document.querySelectorAll('.nav-link');
+        const sections = document.querySelectorAll('section');
+
+        window.addEventListener('scroll', () => {
+            let current = '';
+            sections.forEach(section => {
+                const sectionTop = section.offsetTop;
+                if (pageYOffset >= sectionTop - 60) { // 60 is approx nav height
+                    current = section.getAttribute('id');
+                }
+            });
+
+            navLinks.forEach(link => {
+                link.classList.remove('active');
+                if (link.getAttribute('href').substring(1) === current) {
+                    link.classList.add('active');
+                }
+            });
+        });
+    </script>
+</body>
+</html>
